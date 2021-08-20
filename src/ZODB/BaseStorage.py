@@ -25,6 +25,7 @@ from struct import pack as _structpack, unpack as _structunpack
 
 import zope.interface
 from persistent.TimeStamp import TimeStamp
+from datetime import timedelta
 
 import ZODB.interfaces
 from . import POSException, utils
@@ -286,6 +287,7 @@ def copy(source, dest, verbose=0):
     another.  `source` must have an .iterator() method.
     """
     _ts = None
+    start = None
     ok = 1
     preindex = {};
     preget = preindex.get
@@ -302,15 +304,25 @@ def copy(source, dest, verbose=0):
     # copyTransactionsFrom() may fail with VersionLockError or
     # ConflictError.
     restoring = py2_hasattr(dest, 'restore')
+
+    # Counting transactions prior to copying is probably going to be expensive
+    print("%s Counting transactions to be copied" % time.strftime("%x %X"))
+    fiter = [i for i in source.iterator()]
+    count = len(fiter)
+    this = 0
+    print("%s Going to copy %i transactions." % (time.strftime("%x %X"), count))
+
     fiter = source.iterator()
     for transaction in fiter:
         tid = transaction.tid
         if _ts is None:
-            _ts = TimeStamp(tid)
+            start = _ts = TimeStamp(tid)
         else:
-            t = TimeStamp(tid)
+            end = t = TimeStamp(tid)
             if t <= _ts:
-                if ok: print(('Time stamps out of order %s, %s' % (_ts, t)))
+                if ok: print(('Time stamps out of order %s, %s' % (
+                    time.strftime("%x %X"), 
+                    t)))
                 ok = 0
                 _ts = t.laterThan(_ts)
                 tid = _ts.raw()
@@ -322,6 +334,10 @@ def copy(source, dest, verbose=0):
 
         if verbose:
             print(_ts)
+        this = this + 1
+        if this % 100 == 0:
+            print("%s Copied transaction: %i out of %i" % (
+                time.strftime("%x %X"), this, count))
 
         dest.tpc_begin(transaction, tid, transaction.status)
         for r in transaction:
@@ -339,6 +355,14 @@ def copy(source, dest, verbose=0):
         dest.tpc_vote(transaction)
         dest.tpc_finish(transaction)
 
+    dur = timedelta(seconds=start.second()-end.second())
+    print("Copied %i transactions in %s days, %s hours, %s minutes, %s seconds" %(
+        count,
+        dur.days,
+        dur.seconds//3600,
+        (dur.seconds//60)%60,
+        dur.seconds%3600
+    ))
 
 # defined outside of BaseStorage to facilitate independent reuse.
 # just depends on _transaction attr and getTid method.
