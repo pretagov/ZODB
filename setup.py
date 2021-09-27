@@ -174,7 +174,7 @@ long_description = str(
     ).decode('latin-1').replace(u'L\xf6wis', '|Lowis|')
     )+ '''\n\n.. |Lowis| unicode:: L \\xf6 wis\n'''
 
-setup(name="ZODB3",
+setup(name="ZODB",
       version=VERSION,
       maintainer="Zope Foundation and Contributors",
       maintainer_email="zodb-dev@zope.org",
